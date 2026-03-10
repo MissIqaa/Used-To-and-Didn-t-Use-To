@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Player Grammar Quiz - Stable Version</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { height: 100%; font-family: 'Comic Sans MS', sans-serif; overflow: hidden; background: #333; }
+
+        .game-container { display: flex; height: 100vh; width: 100vw; }
+
+        /* Player Sides */
+        .player-side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            transition: opacity 0.5s;
+        }
+
+        #p1-side { background-color: #FFEB3B; border-right: 5px solid #222; }
+        #p2-side { background-color: #00E5FF; }
+
+        /* UI Elements */
+        .header { margin-bottom: 20px; }
+        .player-name { font-size: 2.5rem; font-weight: bold; margin-bottom: 5px; }
+        .score-board { font-size: 1.5rem; font-weight: bold; background: rgba(255,255,255,0.6); padding: 8px 20px; border-radius: 50px; border: 2px solid #333; }
+
+        .question-box { 
+            font-size: 2.2rem; 
+            min-height: 220px; 
+            margin-bottom: 30px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 10px;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .quiz-btn {
+            padding: 25px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: 5px solid #333;
+            border-radius: 20px;
+            background-color: white;
+            box-shadow: 0 8px 0 #333;
+            transition: all 0.1s;
+            outline: none;
+        }
+
+        /* Active/Disabled States */
+        .quiz-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 4px 0 #333; }
+        .quiz-btn:disabled { opacity: 0.7; cursor: not-allowed; filter: grayscale(0.5); }
+
+        /* Pop-up Feedback */
+        .feedback-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 4.5rem;
+            font-weight: bold;
+            z-index: 100;
+            pointer-events: none;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-shadow: 4px 4px 0px #fff;
+        }
+
+        .feedback-overlay.show { transform: translate(-50%, -50%) scale(1); }
+        .correct-color { color: #2E7D32; }
+        .wrong-color { color: #C62828; }
+
+        .finished-text { font-size: 4rem; color: #222; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        @media (max-width: 800px) {
+            .player-name { font-size: 1.8rem; }
+            .question-box { font-size: 1.5rem; }
+            .quiz-btn { font-size: 1.4rem; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div id="p1-side" class="player-side">
+        <div id="p1-feedback" class="feedback-overlay"></div>
+        <div class="header">
+            <div class="player-name">Player 1</div>
+            <div class="score-board">Score: <span id="p1-score">0</span> / 10</div>
+        </div>
+        <div id="p1-main">
+            <div class="question-box" id="p1-q">Loading...</div>
+            <div class="button-group">
+                <button class="quiz-btn p1-btns" style="color: #2E7D32;" onclick="check(1, 'used to')">used to</button>
+                <button class="quiz-btn p1-btns" style="color: #C62828;" onclick="check(1, 'didn’t use to')">didn’t use to</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="p2-side" class="player-side">
+        <div id="p2-feedback" class="feedback-overlay"></div>
+        <div class="header">
+            <div class="player-name">Player 2</div>
+            <div class="score-board">Score: <span id="p2-score">0</span> / 10</div>
+        </div>
+        <div id="p2-main">
+            <div class="question-box" id="p2-q">Loading...</div>
+            <div class="button-group">
+                <button class="quiz-btn p2-btns" style="color: #2E7D32;" onclick="check(2, 'used to')">used to</button>
+                <button class="quiz-btn p2-btns" style="color: #C62828;" onclick="check(2, 'didn’t use to')">didn’t use to</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const rawQuestions = [
+        { s: "She ______ be scared of clowns. Now, she’s not scared of them anymore.", a: "used to" },
+        { s: "I ______ like vegetables. Now, I eat them every day.", a: "didn’t use to" },
+        { s: "We ______ play outside every evening. Now, we stay indoors more often.", a: "used to" },
+        { s: "He ______ wake up early. Now, he wakes up at 6 a.m. every day.", a: "didn’t use to" },
+        { s: "They ______ live in a small village. Now, they live in the city.", a: "used to" },
+        { s: "I ______ drink coffee. Now, I drink it every morning.", a: "didn’t use to" },
+        { s: "My father ______ ride a bicycle to work. Now, he drives a car.", a: "used to" },
+        { s: "She ______ watch horror movies. Now, she enjoys them.", a: "didn’t use to" },
+        { s: "We ______ play football after school. Now, we are too busy with homework.", a: "used to" },
+        { s: "He ______ eat spicy food. Now, he loves spicy noodles.", a: "didn’t use to" }
+    ];
+
+    let game = {
+        p1: { idx: 0, score: 0, set: [] },
+        p2: { idx: 0, score: 0, set: [] }
+    };
+
+    function shuffle(arr) {
+        let newArr = [...arr];
+        for (let i = newArr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+        }
+        return newArr;
+    }
+
+    function updateUI(pNum) {
+        const p = game[`p${pNum}`];
+        const qEl = document.getElementById(`p${pNum}-q`);
+        const sEl = document.getElementById(`p${pNum}-score`);
+        const mainEl = document.getElementById(`p${pNum}-main`);
+
+        if (p.idx < p.set.length) {
+            qEl.innerText = p.set[p.idx].s;
+            sEl.innerText = p.score;
+        } else {
+            mainEl.innerHTML = `<div class="finished-text">Finished!</div>
+                               <div style="font-size:2rem; margin-top:10px;">Final Score: ${p.score}/10</div>
+                               <button class="quiz-btn" style="margin-top:20px;" onclick="location.reload()">Reset</button>`;
+        }
+    }
+
+    window.check = function(pNum, choice) {
+        const p = game[`p${pNum}`];
+        const feedback = document.getElementById(`p${pNum}-feedback`);
+        const buttons = document.querySelectorAll(`.p${pNum}-btns`);
+
+        if (p.idx >= p.set.length) return;
+
+        // DISABLE BUTTONS IMMEDIATELY (Prevents the freeze/race condition)
+        buttons.forEach(b => b.disabled = true);
+
+        const correct = choice === p.set[p.idx].a;
+        if (correct) {
+            p.score++;
+            feedback.innerText = "Correct! ✅";
+            feedback.className = "feedback-overlay show correct-color";
+        } else {
+            feedback.innerText = "Wrong! ❌";
+            feedback.className = "feedback-overlay show wrong-color";
+        }
+
+        // WAIT 800ms THEN MOVE ON
+        setTimeout(() => {
+            feedback.className = "feedback-overlay"; // Hide feedback
+            p.idx++;
+            updateUI(pNum);
+            
+            // Re-enable buttons for the next question
+            buttons.forEach(b => b.disabled = false);
+        }, 800);
+    }
+
+    // Initialize
+    game.p1.set = shuffle(rawQuestions);
+    game.p2.set = shuffle(rawQuestions);
+    updateUI(1);
+    updateUI(2);
+</script>
+
+</body>
+</html>
